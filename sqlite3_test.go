@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/db-journey/migrate/direction"
 	"github.com/db-journey/migrate/file"
-	"github.com/db-journey/migrate/migrate/direction"
 	pipep "github.com/db-journey/migrate/pipe"
 )
 

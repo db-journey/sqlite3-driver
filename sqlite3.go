@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/db-journey/migrate/direction"
 	"github.com/db-journey/migrate/driver"
 	"github.com/db-journey/migrate/file"
-	"github.com/db-journey/migrate/migrate/direction"
 	"github.com/mattn/go-sqlite3"
 )
 

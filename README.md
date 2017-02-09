@@ -17,5 +17,5 @@ journey help # for more info
 
 ## Authors
 
-* Matthias Kadenbach, https://github.com/gemnasium
+* Matthias Kadenbach, https://github.com/mattes
 * Caesar Wirth, https://github.com/cjwirth

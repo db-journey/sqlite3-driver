@@ -10,7 +10,7 @@ import (
 	"github.com/db-journey/migrate/direction"
 	"github.com/db-journey/migrate/driver"
 	"github.com/db-journey/migrate/file"
-	"github.com/mattn/go-sqlite3"
+	gosqlite3 "github.com/mattn/go-sqlite3"
 )
 
 type Driver struct {
@@ -94,7 +94,7 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	queries := splitStatements(string(f.Content))
 	for _, query := range queries {
 		if _, err := tx.Exec(query); err != nil {
-			sqliteErr, isErr := err.(sqlite3.Error)
+			sqliteErr, isErr := err.(gosqlite3.Error)
 			if isErr {
 				// The sqlite3 library only provides error codes, not position information. Output what we do know.
 				pipe <- fmt.Errorf("SQLite Error (%s); Extended (%s)\nError: %s",

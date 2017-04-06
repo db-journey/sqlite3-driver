@@ -17,6 +17,9 @@ type Driver struct {
 	db *sql.DB
 }
 
+// make sure our driver still implements the driver.Driver interface
+var _ driver.Driver = (*Driver)(nil)
+
 const tableName = "schema_migration"
 
 func (driver *Driver) Initialize(url string) error {
@@ -148,6 +151,12 @@ func (driver *Driver) Versions() (file.Versions, error) {
 	}
 	err = rows.Err()
 	return versions, err
+}
+
+// Execute a SQL statement
+func (driver *Driver) Execute(statement string) error {
+	_, err := driver.db.Exec(statement)
+	return err
 }
 
 func init() {

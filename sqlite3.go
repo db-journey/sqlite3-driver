@@ -61,37 +61,34 @@ func (driver *Driver) FilenameExtension() string {
 	return "sql"
 }
 
-func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
-	defer close(pipe)
-	pipe <- f
+func (driver *Driver) FileTemplate() []byte {
+	return []byte("")
+}
 
+func (driver *Driver) Migrate(f file.File) error {
 	tx, err := driver.db.Begin()
 	if err != nil {
-		pipe <- err
-		return
+		return err
 	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
 
 	if f.Direction == direction.Up {
-		if _, err := tx.Exec("INSERT INTO "+tableName+" (version) VALUES (?)", f.Version); err != nil {
-			pipe <- err
-			if err := tx.Rollback(); err != nil {
-				pipe <- err
-			}
-			return
+		if _, err = tx.Exec("INSERT INTO "+tableName+" (version) VALUES (?)", f.Version); err != nil {
+			return err
 		}
 	} else if f.Direction == direction.Down {
-		if _, err := tx.Exec("DELETE FROM "+tableName+" WHERE version=?", f.Version); err != nil {
-			pipe <- err
-			if err := tx.Rollback(); err != nil {
-				pipe <- err
-			}
-			return
+		if _, err = tx.Exec("DELETE FROM "+tableName+" WHERE version=?", f.Version); err != nil {
+			return err
 		}
 	}
 
-	if err := f.ReadContent(); err != nil {
-		pipe <- err
-		return
+	if err = f.ReadContent(); err != nil {
+		return err
 	}
 
 	queries := splitStatements(string(f.Content))
@@ -100,22 +97,14 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 			sqliteErr, isErr := err.(gosqlite3.Error)
 			if isErr {
 				// The sqlite3 library only provides error codes, not position information. Output what we do know.
-				pipe <- fmt.Errorf("SQLite Error (%s); Extended (%s)\nError: %s",
+				return fmt.Errorf("SQLite Error (%s); Extended (%s)\nError: %s",
 					sqliteErr.Code.Error(), sqliteErr.ExtendedCode.Error(), sqliteErr.Error())
-			} else {
-				pipe <- fmt.Errorf("An error occurred when running query [%q]: %v", query, err)
 			}
-			if err := tx.Rollback(); err != nil {
-				pipe <- err
-			}
-			return
+			return fmt.Errorf("An error occurred when running query [%q]: %v", query, err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		pipe <- err
-		return
-	}
+	return tx.Commit()
 }
 
 // Version returns the current migration version.

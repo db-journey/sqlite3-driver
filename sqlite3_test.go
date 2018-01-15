@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/db-journey/migrate/direction"
+	"github.com/db-journey/migrate/driver"
 	"github.com/db-journey/migrate/file"
 )
 
@@ -19,8 +20,8 @@ func TestMigrate(t *testing.T) {
 	}
 	defer os.Remove(f.Name())
 
-	d := &Driver{}
-	if err := d.Initialize("sqlite3://" + f.Name()); err != nil {
+	var d driver.Driver
+	if d, err = Open("sqlite3://" + f.Name()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -99,7 +100,7 @@ func TestMigrate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.db.Query("SELECT id, data1, data2 FROM yolo"); err != nil {
+	if _, err := d.(*Driver).db.Query("SELECT id, data1, data2 FROM yolo"); err != nil {
 		t.Errorf("Sequential migration failed: %v", err)
 	}
 

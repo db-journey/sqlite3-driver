@@ -17,30 +17,28 @@ type Driver struct {
 	db *sql.DB
 }
 
-// make sure our driver still implements the driver.Driver interface
-var _ driver.Driver = (*Driver)(nil)
-
 const tableName = "schema_migration"
 
-func (driver *Driver) Initialize(url string) error {
+func Open(url string) (driver.Driver, error) {
+	driver := &Driver{}
 	filename := strings.SplitN(url, "sqlite3://", 2)
 	if len(filename) != 2 {
-		return errors.New("invalid sqlite3:// scheme")
+		return nil, errors.New("invalid sqlite3:// scheme")
 	}
 
 	db, err := sql.Open("sqlite3", filename[1])
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := db.Ping(); err != nil {
-		return err
+		return nil, err
 	}
 	driver.db = db
 
 	if err := driver.ensureVersionTableExists(); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return driver, nil
 }
 
 func (driver *Driver) Close() error {
@@ -55,14 +53,6 @@ func (driver *Driver) ensureVersionTableExists() error {
 		return err
 	}
 	return nil
-}
-
-func (driver *Driver) FilenameExtension() string {
-	return "sql"
-}
-
-func (driver *Driver) FileTemplate() []byte {
-	return []byte("")
 }
 
 func (driver *Driver) Migrate(f file.File) error {
@@ -148,8 +138,14 @@ func (driver *Driver) Execute(statement string) error {
 	return err
 }
 
+type factory struct{}
+
+func (f factory) New(url string) (driver.Driver, error) {
+	return Open(url)
+}
+
 func init() {
-	driver.RegisterDriver("sqlite3", &Driver{})
+	driver.Register("sqlite3", "sql", nil, factory{})
 }
 
 // This naive implementation doesn't account for quoted ";" inside statements.

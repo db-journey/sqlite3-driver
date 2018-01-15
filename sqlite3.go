@@ -138,14 +138,8 @@ func (driver *Driver) Execute(statement string) error {
 	return err
 }
 
-type factory struct{}
-
-func (f factory) New(url string) (driver.Driver, error) {
-	return Open(url)
-}
-
 func init() {
-	driver.Register("sqlite3", "sql", nil, factory{})
+	driver.Register("sqlite3", "sql", nil, Open)
 }
 
 // This naive implementation doesn't account for quoted ";" inside statements.

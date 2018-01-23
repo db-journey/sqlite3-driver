@@ -17,30 +17,28 @@ type Driver struct {
 	db *sql.DB
 }
 
-// make sure our driver still implements the driver.Driver interface
-var _ driver.Driver = (*Driver)(nil)
-
 const tableName = "schema_migration"
 
-func (driver *Driver) Initialize(url string) error {
+func Open(url string) (driver.Driver, error) {
+	driver := &Driver{}
 	filename := strings.SplitN(url, "sqlite3://", 2)
 	if len(filename) != 2 {
-		return errors.New("invalid sqlite3:// scheme")
+		return nil, errors.New("invalid sqlite3:// scheme")
 	}
 
 	db, err := sql.Open("sqlite3", filename[1])
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := db.Ping(); err != nil {
-		return err
+		return nil, err
 	}
 	driver.db = db
 
 	if err := driver.ensureVersionTableExists(); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return driver, nil
 }
 
 func (driver *Driver) Close() error {
@@ -57,41 +55,30 @@ func (driver *Driver) ensureVersionTableExists() error {
 	return nil
 }
 
-func (driver *Driver) FilenameExtension() string {
-	return "sql"
-}
-
-func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
-	defer close(pipe)
-	pipe <- f
-
+func (driver *Driver) Migrate(f file.File) error {
 	tx, err := driver.db.Begin()
 	if err != nil {
-		pipe <- err
-		return
+		return err
 	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
 
 	if f.Direction == direction.Up {
-		if _, err := tx.Exec("INSERT INTO "+tableName+" (version) VALUES (?)", f.Version); err != nil {
-			pipe <- err
-			if err := tx.Rollback(); err != nil {
-				pipe <- err
-			}
-			return
+		if _, err = tx.Exec("INSERT INTO "+tableName+" (version) VALUES (?)", f.Version); err != nil {
+			return err
 		}
 	} else if f.Direction == direction.Down {
-		if _, err := tx.Exec("DELETE FROM "+tableName+" WHERE version=?", f.Version); err != nil {
-			pipe <- err
-			if err := tx.Rollback(); err != nil {
-				pipe <- err
-			}
-			return
+		if _, err = tx.Exec("DELETE FROM "+tableName+" WHERE version=?", f.Version); err != nil {
+			return err
 		}
 	}
 
-	if err := f.ReadContent(); err != nil {
-		pipe <- err
-		return
+	if err = f.ReadContent(); err != nil {
+		return err
 	}
 
 	queries := splitStatements(string(f.Content))
@@ -100,22 +87,14 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 			sqliteErr, isErr := err.(gosqlite3.Error)
 			if isErr {
 				// The sqlite3 library only provides error codes, not position information. Output what we do know.
-				pipe <- fmt.Errorf("SQLite Error (%s); Extended (%s)\nError: %s",
+				return fmt.Errorf("SQLite Error (%s); Extended (%s)\nError: %s",
 					sqliteErr.Code.Error(), sqliteErr.ExtendedCode.Error(), sqliteErr.Error())
-			} else {
-				pipe <- fmt.Errorf("An error occurred when running query [%q]: %v", query, err)
 			}
-			if err := tx.Rollback(); err != nil {
-				pipe <- err
-			}
-			return
+			return fmt.Errorf("An error occurred when running query [%q]: %v", query, err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		pipe <- err
-		return
-	}
+	return tx.Commit()
 }
 
 // Version returns the current migration version.
@@ -160,7 +139,7 @@ func (driver *Driver) Execute(statement string) error {
 }
 
 func init() {
-	driver.RegisterDriver("sqlite3", &Driver{})
+	driver.Register("sqlite3", "sql", nil, Open)
 }
 
 // This naive implementation doesn't account for quoted ";" inside statements.

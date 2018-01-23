@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/db-journey/migrate/direction"
+	"github.com/db-journey/migrate/driver"
 	"github.com/db-journey/migrate/file"
-	pipep "github.com/db-journey/migrate/pipe"
 )
 
 // TestMigrate runs some additional tests on Migrate()
@@ -20,8 +20,8 @@ func TestMigrate(t *testing.T) {
 	}
 	defer os.Remove(f.Name())
 
-	d := &Driver{}
-	if err := d.Initialize("sqlite3://" + f.Name()); err != nil {
+	var d driver.Driver
+	if d, err = Open("sqlite3://" + f.Name()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -73,11 +73,9 @@ func TestMigrate(t *testing.T) {
 		},
 	}
 
-	pipe := pipep.New()
-	go d.Migrate(files[0], pipe)
-	errs := pipep.ReadErrors(pipe)
-	if len(errs) > 0 {
-		t.Fatal(errs)
+	err = d.Migrate(files[0])
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	version, err := d.Version()
@@ -98,13 +96,11 @@ func TestMigrate(t *testing.T) {
 		t.Errorf("Expected versions to be: %v, got: %v", expectedVersions, versions)
 	}
 
-	pipe = pipep.New()
-	go d.Migrate(files[1], pipe)
-	errs = pipep.ReadErrors(pipe)
-	if len(errs) > 0 {
-		t.Fatal(errs)
+	err = d.Migrate(files[1])
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := d.db.Query("SELECT id, data1, data2 FROM yolo"); err != nil {
+	if _, err := d.(*Driver).db.Query("SELECT id, data1, data2 FROM yolo"); err != nil {
 		t.Errorf("Sequential migration failed: %v", err)
 	}
 
@@ -118,17 +114,13 @@ func TestMigrate(t *testing.T) {
 		t.Errorf("Expected versions to be: %v, got: %v", expectedVersions, versions)
 	}
 
-	pipe = pipep.New()
-	go d.Migrate(files[2], pipe)
-	errs = pipep.ReadErrors(pipe)
-	if len(errs) > 0 {
-		t.Fatal(errs)
+	err = d.Migrate(files[2])
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	pipe = pipep.New()
-	go d.Migrate(files[3], pipe)
-	errs = pipep.ReadErrors(pipe)
-	if len(errs) == 0 {
+	err = d.Migrate(files[3])
+	if err == nil {
 		t.Error("Expected test case to fail")
 	}
 

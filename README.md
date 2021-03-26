@@ -10,8 +10,8 @@
 ## Usage
 
 ```bash
-journey -url sqlite3://database.sqlite -path ./db/migrations create add_field_to_table
-journey -url sqlite3://database.sqlite -path ./db/migrations up
+journey -url sqlite3://database.sqlite -path ./db/migrations migrate create add_field_to_table
+journey -url sqlite3://database.sqlite -path ./db/migrations migrate up
 journey help # for more info
 ```
 
